@@ -21,6 +21,7 @@ void showMap()
             printf("            +       +\n");
             printf("            |\n");
             printf("            +---+\n");
+            return;
         }
     }
 
@@ -67,6 +68,8 @@ void move(const char *direction)
 
 void look()
 {
+    bool hasConnection = false;
+
     Room *currentRoom = &rooms[player.currentRoom];
 
     printf("%s\n", currentRoom->description);
@@ -99,6 +102,8 @@ void look()
     {
         if (currentRoom->connections[i] != -1)
         {
+            hasConnection = true;
+
             switch (i)
             {
             case 0:
@@ -116,6 +121,13 @@ void look()
             }
         }
     }
+
+    // At the end of the game
+    if (!hasConnection)
+    {
+        printf("Death");
+    }
+
     printf("\n");
 }
 
@@ -128,13 +140,16 @@ void inventory()
     }
 
     printf("You have the following items:\n");
-    for (int i = 0; i < player.inventoryCount; i++)
+    for (int i = 0; i < INVENTORY_LIMIT; i++)
     {
         int equipped = 0;
 
         // Cath NULL
         if (player.inventory[i] == NULL)
+        {
+            printf("%d- Empty Slot\n", i + 1);
             continue;
+        }
 
         // If the iterated item and current equipped item is equal, print it as Equipped
         if (strcmp(player.inventory[i]->description, player.attackItem->description) == 0 ||
@@ -186,26 +201,32 @@ void pickup(const char *item)
         return;
     }
 
+    // Search the room for item to pick up
     for (int i = 0; i < MAX_ITEMS_IN_ROOM; i++)
     {
-        // Cath NULL
+        // Skip the empty slot
         if (currentRoom->items[i] == NULL)
             continue;
 
-        // Special pick up for elixirs
-        if (currentRoom->items[i]->itemType == 4)
-        {
-            player.health = fmin(200, player.health + currentRoom->items[i]->defensePower);
-            printf("You found and drank an elixir of life.\n(Current Health: %d)\n", player.health);
-
-            currentRoom->items[i] = NULL;
-            currentRoom->itemCount--;
-            return;
-        }
-
-        // Pick up here
+        // Found item to pick up
         if (strcmp(currentRoom->items[i]->description, item) == 0)
         {
+            if (currentRoom->items[i]->itemType == 5)
+                printf("You cannot equip Map.\n");
+            
+
+            // Special pick up for elixirs
+            if (currentRoom->items[i]->itemType == 4)
+            {
+                player.health = fmin(150, player.health + currentRoom->items[i]->defensePower);
+                printf("You found and drank an elixir of life.\n(Current Health: %d)\n", player.health);
+
+                currentRoom->items[i] = NULL;
+                currentRoom->itemCount--;
+                return;
+            }
+
+            // Search for an empty slot in inventory
             for (int j = 0; j < INVENTORY_LIMIT; j++)
             {
                 if (player.inventory[j] == NULL)
@@ -280,6 +301,14 @@ void drop(const char *item)
 {
     Room *currentRoom = &rooms[player.currentRoom];
 
+    // Inform user of dropping main equipment is not allowed
+    if (strcmp(item, "Handfist") == 0 || strcmp(item, "Shirt") == 0 || strcmp(item, "Drape") == 0)
+    {
+        printf("You cannot drop your main equipment.\n");
+        return;
+    }
+
+    // Search inventory for the item to drop
     for (int i = 0; i < INVENTORY_LIMIT; i++)
     {
         // Catch NULL
@@ -295,13 +324,6 @@ void drop(const char *item)
                 return;
             }
 
-            // Block drop on main equipments
-            if (strcmp(player.inventory[i]->description, "Handfist") == 0 || strcmp(player.inventory[i]->description, "Shirt") == 0 || strcmp(player.inventory[i]->description, "Nothing") == 0)
-            {
-                printf("You cannot drop your main equipment.\n");
-                return;
-            }
-
             // Block drop on equipped item
             if (player.inventory[i]->equipped == 1)
             {
@@ -309,22 +331,24 @@ void drop(const char *item)
                 return;
             }
 
+            // Search for an empty sloat in the room
             for (int j = 0; j < MAX_ITEMS_IN_ROOM; j++)
             {
-                // Tricky part implementation, add dropped item to room
+                // Reach to the empty slot
                 if (currentRoom->items[j] == NULL)
                 {
+                    // Add dropped item to room
                     currentRoom->items[j] = player.inventory[i];
                     currentRoom->itemCount++;
+
+                    // Remove item from inventory
+                    printf("%s dropped.\n", player.inventory[i]->description);
+                    player.inventory[i] = NULL;
+                    player.inventoryCount--;
+
+                    return;
                 }
             }
-
-            // Remove item from inventory
-            printf("%s dropped.\n", player.inventory[i]->description);
-            player.inventory[i] = NULL;
-            player.inventoryCount--;
-
-            return;
         }
     }
 
@@ -333,8 +357,15 @@ void drop(const char *item)
 
 void checkYourself()
 {
-    printf("Health: %d, Attack Power: %d, Defense Power: %d\n",
+    // Power and health
+    printf("Health: %d\nAttack Power: %d\nDefense Power: %d\n",
            player.health, player.attackPower, player.defensePower);
+
+    printf("\n");
+
+    // Equipped items
+    printf("Attack Item: %s\nArmor: %s\nShield: %s\n",
+           player.attackItem->description, player.armor->description, player.shield->description);
 }
 
 void attack(const char *kill)
@@ -349,7 +380,7 @@ void attack(const char *kill)
     }
 
     Creature *creature = currentRoom->creature;
-    int creatureStrength = creature->strength / 2; // To heal player after battle
+    int heal = creature->strength / 2; // To heal player after battle
 
     // Combat system: One attack player, one attack creature
     // if user enters 'attack kill', continue fighting until one of them is dead.
@@ -366,12 +397,11 @@ void attack(const char *kill)
             {
                 printf("You killed the nightmare of the forest! History will remember you!!!\n");
                 printf("||||||||||||||||||||||===================END===================||||||||||||||||||||||\n");
-                exitGame();
             }
-            
+
             // Heal player with respect to creature strength and delete creature
-            printf("You defeated the %s!\n(Remaining Health: %d(+%d))\n", creature->name, player.health, creatureStrength);
-            player.health += creatureStrength;
+            printf("You defeated the %s!\n(Remaining Health: %d(+%d))\n", creature->name, player.health, heal);
+            player.health = fmin(150, player.health + heal);
 
             free(currentRoom->creature);
             currentRoom->creature = NULL;
@@ -379,8 +409,11 @@ void attack(const char *kill)
         }
 
         // Creature attacks
-        player.health -= creature->strength + player.defensePower;
-        printf("The %s hit you for %d (-%d) damage.\n", creature->name, creature->strength, player.defensePower);
+        player.health -= fmax(creature->strength - player.defensePower, 0);
+        printf("The %s hit you for %d (-%d) damage.\n", 
+            creature->name, 
+            creature->strength, 
+            (int)fmin(creature->strength, player.defensePower));
 
         if (player.health <= 0)
         {

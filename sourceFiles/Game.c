@@ -43,7 +43,7 @@ void addCreatureToRoom(int roomCount, char name[MAX_DESCRIPTION], int health, in
 
 //================||| LOGINSCREEN |||================//
 /* User can only start, load or exit the game while on the login screen */
-/* 
+/*
     It returns bool. Because according to the return value, user will be
     quit from the loginscreen and head to the in-game menu.
 
@@ -58,7 +58,7 @@ bool loginScreen(const char *command)
     if (strcmp(action, "start") == 0)
     {
         startGame();
-        look();
+        printf("%s", rooms[0].description);
         return true;
     }
     else if (strcmp(action, "load") == 0 && args == 2)
@@ -68,13 +68,17 @@ bool loginScreen(const char *command)
             look();
             return true;
         }
-        
+
         return false;
-        
     }
     else if (strcmp(action, "list") == 0)
     {
         listSavedGames();
+        return false;
+    }
+    else if (strcmp(action, "clean") == 0)
+    {
+        clearScreen();
         return false;
     }
     else if (strcmp(action, "exit") == 0)
@@ -100,7 +104,6 @@ void handleCommand(const char *command)
     char action[32], argument[64];
     int args = sscanf(command, "%31s %63[^\n]", action, argument);
 
-    
     if (strcmp(action, "move") == 0 && args == 2)
         move(argument);
     else if (strcmp(action, "look") == 0)
@@ -171,7 +174,7 @@ void initGame()
     //========== INITIALIZE PATHS ==========//
     //========> PATH 0
     // Directions
-    strcpy(rooms[roomCount].description, "All is quiet and restless. You can smell the evil in the air.\n");
+    strcpy(rooms[roomCount].description, "You can smell the evil in the air. Find a way out from this place!\n");
     rooms[roomCount].connections[1] = 1;
 
     roomCount++;
@@ -296,7 +299,7 @@ void startGame()
     char creatureToAdd[MAX_DESCRIPTION] = "";
 
     // Initialize player
-    player.health = 200;
+    player.health = 150;
     player.attackPower = 5;
     player.defensePower = 0;
     player.inventoryCount = 0;
@@ -305,7 +308,7 @@ void startGame()
     strcpy(player.attackItem->description, "Handfist");
     player.attackItem->itemType = 1;
     player.attackItem->attackPower = 5;
-    player.attackItem->defensePower = 2;
+    player.attackItem->defensePower = 0;
     player.attackItem->equipped = 1;
     player.armor = malloc(sizeof(Item));
     strcpy(player.armor->description, "Shirt");
@@ -314,19 +317,15 @@ void startGame()
     player.armor->defensePower = 0;
     player.armor->equipped = 1;
     player.shield = malloc(sizeof(Item));
-    strcpy(player.shield->description, "Nothing");
+    strcpy(player.shield->description, "Drape");
     player.shield->itemType = 3;
     player.shield->attackPower = 0;
     player.shield->defensePower = 0;
     player.shield->equipped = 1;
-    player.inventory[player.inventoryCount++] = player.attackItem;
-    player.inventory[player.inventoryCount++] = player.armor;
-    player.inventory[player.inventoryCount++] = player.shield;
 
     //============= INITIALIZE PATHS =============//
     //========> PATH 0
     // Directions
-    strcpy(rooms[roomCount].description, "All is quiet and restless. You can smell the evil in the air.\n");
     rooms[roomCount].connections[1] = 1;
 
     roomCount++;
@@ -420,12 +419,12 @@ void startGame()
     strcpy(itemToAdd, "SwordOfSteel");
     addItemToRoom(roomCount, itemToAdd, 1, 31, 4);
 
-    strcpy(itemToAdd, "Big Elixir");
+    strcpy(itemToAdd, "BigElixir");
     addItemToRoom(roomCount, itemToAdd, 4, 0, 50);
 
     // Creature
     strcpy(creatureToAdd, "Basilisk");
-    addCreatureToRoom(roomCount, creatureToAdd, 150, 25);
+    addCreatureToRoom(roomCount, creatureToAdd, 150, 32);
 
     roomCount++;
 
@@ -469,14 +468,22 @@ void saveGame(const char *filename)
     // Health, power, currentRoom, inventory
     fprintf(file, "%d %d %d %d\n", player.health, player.attackPower, player.defensePower, player.currentRoom);
     fprintf(file, "%d\n", player.inventoryCount);
-    for (int i = 0; i < player.inventoryCount; i++)
+    for (int i = 0; i < INVENTORY_LIMIT; i++)
     {
-        fprintf(file, "%s %d %d %d %d\n",
-                player.inventory[i]->description,
-                player.inventory[i]->itemType,
-                player.inventory[i]->attackPower,
-                player.inventory[i]->defensePower,
-                player.inventory[i]->equipped);
+        if (player.inventory[i] == NULL)
+        {
+            fprintf(file, "%s %d %d %d %d\n",
+                    "EmptySlot", 0, 0, 0, 0);
+        }
+        else
+        {
+            fprintf(file, "%s %d %d %d %d\n",
+                    player.inventory[i]->description,
+                    player.inventory[i]->itemType,
+                    player.inventory[i]->attackPower,
+                    player.inventory[i]->defensePower,
+                    player.inventory[i]->equipped);
+        }
     }
 
     //========> SAVE ROOM ATTRIBUTES
@@ -487,8 +494,11 @@ void saveGame(const char *filename)
         fprintf(file, "%d\n", rooms[i].itemCount);
 
         // Save the items
-        for (int j = 0; j < rooms[i].itemCount; j++)
+        for (int j = 0; j < MAX_ITEMS_IN_ROOM; j++)
         {
+            if (rooms[i].items[j] == NULL)
+                continue;
+
             fprintf(file, "%s %d %d %d %d\n",
                     rooms[i].items[j]->description,
                     rooms[i].items[j]->itemType,
@@ -540,7 +550,7 @@ bool loadGame(const char *filename)
         // Health, power, currentRoom, inventory
         fscanf(file, "%d %d %d %d", &player.health, &player.attackPower, &player.defensePower, &player.currentRoom);
         fscanf(file, "%d", &player.inventoryCount);
-        for (int i = 0; i < player.inventoryCount; i++)
+        for (int i = 0; i < INVENTORY_LIMIT; i++)
         {
             Item *item = malloc(sizeof(Item));
             fscanf(file, "%s %d %d %d %d",
@@ -550,6 +560,16 @@ bool loadGame(const char *filename)
                    &item->defensePower,
                    &item->equipped);
             player.inventory[i] = item;
+
+            if (item->equipped == 1)
+            {
+                if (item->itemType == 1)
+                    player.attackItem = item;
+                else if (item->itemType == 2)
+                    player.armor = item;
+                else if (item->itemType == 3)
+                    player.shield = item;
+            }
         }
     }
 
@@ -659,7 +679,7 @@ void help()
     printf("2- load: Load a game\n");
     printf("3- list: List saved files\n");
     printf("4- help: See game commands\n");
-    printf("6- exit: Exit the game\n");
+    printf("5- exit: Exit the game\n");
     printf("\n");
 
     printf("In-Game Commands:\n");
@@ -675,5 +695,6 @@ void help()
     printf("10- save: Save the game\n");
     printf("11- load 'game': Load a saved game\n");
     printf("12- list: List saved files\n");
-    printf("13- exit: Exit the game\n");
+    printf("13- help: See game commands\n");
+    printf("14- exit: Exit the game\n");
 }

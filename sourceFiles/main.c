@@ -11,6 +11,7 @@ int main()
 
     printf("||||||||||||||||||||||===================LONELY FOREST===================||||||||||||||||||||||\n");
 
+    // Login Screen
     while (true)
     {
         printf("\n> START OR LOAD GAME('help' to see game commands): ");
@@ -20,6 +21,7 @@ int main()
             break;
     }
 
+    // In-game
     while (true)
     {
         printf("\n> Command: ");
