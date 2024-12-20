@@ -63,9 +63,14 @@ bool loginScreen(const char *command)
     }
     else if (strcmp(action, "load") == 0 && args == 2)
     {
-        loadGame(argument);
-        look();
-        return true;
+        if (loadGame(argument))
+        {
+            look();
+            return true;
+        }
+        
+        return false;
+        
     }
     else if (strcmp(action, "list") == 0)
     {
@@ -446,7 +451,6 @@ void startGame()
     roomCount++;
 }
 
-//================||| SAVEGAME |||================//
 void saveGame(const char *filename)
 {
     char wFileName[MAX_DESCRIPTION] = "";
@@ -505,15 +509,16 @@ void saveGame(const char *filename)
     printf(">>>SAVED AS '%s'\n", filename);
 }
 
-//================||| LOADGAME |||================//
 /*
     This method initializes the game with load values.
     It is called when the game is being load from a load
     file.
 
     Player and rooms are initialized here with proper values.
+
+    RETURNS FALSE if the file is not found to use in login screen
 */
-void loadGame(const char *filename)
+bool loadGame(const char *filename)
 {
     char rFileName[MAX_DESCRIPTION] = "";
     strcat(rFileName, "saveFiles/");
@@ -522,8 +527,8 @@ void loadGame(const char *filename)
     FILE *file = fopen(rFileName, "r");
     if (!file)
     {
-        perror(">>>NO SAVE FOUND...");
-        return;
+        printf(">>>NO SAVE FOUND AS %s\n", filename);
+        return false;
     }
 
     char buffer[MAX_DESCRIPTION];
@@ -587,9 +592,10 @@ void loadGame(const char *filename)
 
     printf(">>>SAVE '%s' IS LOADED.\n", filename);
     printf("\n");
+
+    return true;
 }
 
-//================||| LISTSAVEDGAMES |||================//
 void listSavedGames()
 {
     int saveCount = 0;
@@ -621,17 +627,13 @@ void listSavedGames()
     FindClose(hFind);
 }
 
-//================||| EXITGAME |||================//
 void exitGame()
 {
     printf("You're leaving the forest... Farewell!\n");
     exit(0);
 }
 
-//================||| PARSEDIRECTION |||================//
-/*
-    Parse the input into an int value
-*/
+// Parse the input into an int value
 int parseDirection(const char *direction)
 {
     if (strcmp(direction, "up") == 0)
@@ -645,13 +647,11 @@ int parseDirection(const char *direction)
     return -1;
 }
 
-//================||| CLEARSCREEN |||================//
 void clearScreen()
 {
     system("cls");
 }
 
-//================||| HELP |||================//
 void help()
 {
     printf("Login Screen Commands:\n");

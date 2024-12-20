@@ -21,7 +21,7 @@ void handleCommand(const char *command);
 void initGame();
 void startGame();
 void saveGame(const char *filepath);
-void loadGame(const char *filepath);
+bool loadGame(const char *filepath);
 void listSavedGames();
 void exitGame();
 int parseDirection(const char *direction);
